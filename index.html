@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>食材解凍效期管理與每日記錄</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Vue 3 CDN -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              periwinkle: '#8894FF',
+              peach: '#FFDCB4',
+              periwinkleDark: '#6c7bf5',
+              periwinkleDeep: '#4a57d6',
+              peachDark: '#f2bd85',
+              peachDeep: '#7a3e14'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [v-cloak] { display: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen antialiased flex flex-col font-sans">
+  <div id="app" v-cloak class="flex-grow flex flex-col">
+
+    <!-- 頂部導航列 -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+      <div class="max-w-6xl mx-auto px-4 py-3 sm:px-6 flex flex-wrap justify-between items-center gap-3">
+        <div class="flex items-center space-x-3">
+          <!-- 核心品牌漸層圖標 (#8894FF + #FFDCB4) -->
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#8894FF] to-[#FFDCB4] flex items-center justify-center text-white shadow-md shadow-[#8894FF]/25">
+            <i class="fa-solid fa-snowflake text-lg drop-shadow-sm"></i>
+          </div>
+          <div>
+            <h1 class="text-lg font-bold text-slate-900 leading-tight flex items-center gap-2">
+              食材解凍效期推算系統
+              <span class="text-xs px-2 py-0.5 rounded-full bg-[#8894FF]/10 text-[#4a57d6] border border-[#8894FF]/30 font-medium">必勝客專用</span>
+            </h1>
+            <p class="text-xs text-slate-500">Code by RainWolf</p>
+          </div>
+        </div>
+
+        <!-- 系統當前時間展示 -->
+        <div class="flex items-center space-x-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600">
+          <i class="fa-regular fa-calendar-check text-[#8894FF]"></i>
+          <span>今天日期：</span>
+          <span class="font-mono font-bold text-slate-800">{{ todayFormatted }}</span>
+        </div>
+      </div>
+
+      <!-- 分頁頁籤 (Tabs) -->
+      <div class="max-w-6xl mx-auto px-4 sm:px-6">
+        <nav class="flex space-x-2 border-b border-transparent">
+          <!-- Tab 1: 效期推算查詢 -->
+          <button 
+            @click="activeTab = 'calculator'"
+            :class="activeTab === 'calculator' ? 'border-[#8894FF] text-[#4a57d6] font-bold bg-[#8894FF]/10' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'"
+            class="px-4 py-3 border-b-2 text-sm transition-all flex items-center gap-2 rounded-t-lg">
+            <i class="fa-solid fa-calculator"></i>
+            效期推算查詢
+          </button>
+
+          <!-- Tab 2: 每日解凍記錄 -->
+          <button 
+            @click="activeTab = 'daily'"
+            :class="activeTab === 'daily' ? 'border-[#8894FF] text-[#4a57d6] font-bold bg-[#8894FF]/10' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'"
+            class="px-4 py-3 border-b-2 text-sm transition-all flex items-center gap-2 rounded-t-lg">
+            <i class="fa-solid fa-calendar-day"></i>
+            每日解凍記錄
+            <span v-if="totalDailyRecordCount > 0" class="bg-[#8894FF] text-white text-xs px-1.5 py-0.2 rounded-full font-mono">
+              {{ totalDailyRecordCount }}
+            </span>
+          </button>
+
+          <!-- Tab 3: 食材資料庫管理 -->
+          <button 
+            @click="activeTab = 'manage'"
+            :class="activeTab === 'manage' ? 'border-[#8894FF] text-[#4a57d6] font-bold bg-[#8894FF]/10' : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100'"
+            class="px-4 py-3 border-b-2 text-sm transition-all flex items-center gap-2 rounded-t-lg">
+            <i class="fa-solid fa-layer-group"></i>
+            食材規則庫
+            <span class="bg-slate-200 text-slate-700 text-xs px-1.5 py-0.2 rounded-full font-mono">{{ ingredients.length }}</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="max-w-6xl mx-auto px-4 py-6 sm:px-6 flex-grow w-full">
+
+      <!-- ========================================== -->
+      <!-- TAB 1: 效期推算查詢 -->
+      <!-- ========================================== -->
+      <section v-if="activeTab === 'calculator'" class="space-y-6">
+        
+        <!-- 頂部提示卡 (#8894FF + #FFDCB4 漸層融合) -->
+        <div class="bg-gradient-to-r from-[#8894FF] via-[#7b88fc] to-[#f4b675] rounded-2xl text-white p-5 shadow-sm shadow-[#8894FF]/20">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-bold mb-1 flex items-center gap-2">
+                <i class="fa-solid fa-bolt text-[#FFDCB4]"></i> 食材解凍效期推算
+              </h2>
+              <p class="text-white/95 text-xs leading-relaxed">
+                「解 1 天用 3 天」推算：例如 <strong class="bg-[#FFDCB4] text-[#7a3e14] px-2 py-0.5 rounded font-mono">{{ calcDisplayDates.exampleText }}</strong>。選擇食材即可自動帶入！
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          <!-- 左側：搜尋與選擇食材 -->
+          <div class="lg:col-span-5 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass text-[#8894FF]"></i>
+                選擇或搜尋食材
+              </h3>
+              <span class="text-xs text-slate-400">點選直接帶入</span>
+            </div>
+
+            <!-- 標籤快速篩選 -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1.5">肉類標籤篩選</label>
+              <div class="flex flex-wrap gap-1.5">
+                <button 
+                  v-for="cat in ['全部', '豬肉', '雞肉', '牛肉', '其他']" 
+                  :key="cat"
+                  @click="calcFilterCat = cat"
+                  :class="calcFilterCat === cat ? 'bg-[#8894FF] text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+                  class="px-2.5 py-1 text-xs rounded-md font-medium transition-colors">
+                  <span v-if="cat === '豬肉'">🐷 </span>
+                  <span v-else-if="cat === '雞肉'">🐔 </span>
+                  <span v-else-if="cat === '牛肉'">🥩 </span>
+                  {{ cat }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 關鍵字搜尋框 -->
+            <div class="relative">
+              <i class="fa-solid fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input 
+                type="text" 
+                v-model="calcSearchKeyword" 
+                placeholder="搜尋食材（如：五花、牛排、雞腿排...）" 
+                class="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#8894FF]">
+            </div>
+
+            <!-- 食材列表 (精簡純粹) -->
+            <div class="max-h-52 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-slate-50">
+              <div 
+                v-for="item in filteredCalcIngredients" 
+                :key="item.id"
+                @click="selectIngredient(item)"
+                :class="selectedIngredient && selectedIngredient.id === item.id ? 'bg-[#8894FF]/10 border-l-4 border-[#8894FF] font-semibold' : 'hover:bg-white'"
+                class="p-2.5 cursor-pointer text-xs flex items-center justify-between transition-colors">
+                <div class="flex items-center space-x-2">
+                  <span :class="getTagBadgeClass(item.category)" class="text-[11px] px-2 py-0.5 rounded-full font-medium">
+                    {{ item.category }}
+                  </span>
+                  <span class="text-slate-800">{{ item.name }}</span>
+                </div>
+                <span class="text-slate-400 font-mono text-[11px]">解{{ item.thawDays }}天/用{{ item.useDays }}天</span>
+              </div>
+              <div v-if="filteredCalcIngredients.length === 0" class="p-4 text-center text-xs text-slate-400">
+                無相符食材，可在「食材規則庫」新增
+              </div>
+            </div>
+
+            <!-- 解凍起始日設定 (預設今天) -->
+            <div class="border-t border-slate-100 pt-3 space-y-2">
+              <div class="flex items-center justify-between">
+                <label class="text-xs font-semibold text-slate-600">
+                  解凍開始日期
+                </label>
+                <button 
+                  @click="resetToToday" 
+                  class="text-xs text-[#4a57d6] hover:text-[#323a8e] font-medium flex items-center gap-1">
+                  <i class="fa-solid fa-rotate-left"></i> 回到今天 ({{ todayFormatted }})
+                </button>
+              </div>
+
+              <input 
+                type="date" 
+                v-model="inputDate" 
+                class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#8894FF] font-mono">
+            </div>
+
+          </div>
+
+          <!-- 右側：推算結果看板 & 一鍵記入每日記錄 -->
+          <div class="lg:col-span-7 space-y-5">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+              
+              <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                <div>
+                  <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">推算結果</span>
+                  <h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    {{ selectedIngredient ? selectedIngredient.name : '請先選取食材' }}
+                    <span v-if="selectedIngredient" :class="getTagBadgeClass(selectedIngredient.category)" class="text-xs px-2 py-0.5 rounded-full font-medium">
+                      {{ selectedIngredient.category }}
+                    </span>
+                  </h3>
+                </div>
+
+                <!-- 核心動作：加入指定日期的解凍記錄 (#8894FF 按鈕) -->
+                <button 
+                  v-if="selectedIngredient"
+                  @click="addCurrentToDailyRecord" 
+                  class="px-4 py-2 bg-[#8894FF] hover:bg-[#7582f8] text-white rounded-xl text-xs font-bold shadow-sm shadow-[#8894FF]/30 transition-all flex items-center gap-2">
+                  <i class="fa-solid fa-calendar-plus"></i>
+                  記入 {{ calcDisplayDates.thawMD }} 解凍記錄
+                </button>
+              </div>
+
+              <!-- 三大里程碑：開始解凍 ➔ 可使用 ➔ 過期 -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <!-- 1. 開始解凍 (#8894FF 柔和色調) -->
+                <div class="bg-[#f5f6ff] border border-[#c5cbff] rounded-xl p-4">
+                  <div class="text-[#4a57d6] font-semibold text-xs flex items-center gap-1.5 mb-1">
+                    <i class="fa-solid fa-snowflake"></i> 1. 解凍日期
+                  </div>
+                  <div class="text-xl font-black text-[#323a8e] font-mono">
+                    {{ calcDisplayDates.thawMD || '--' }}
+                  </div>
+                  <div class="text-[11px] text-slate-500 mt-1">
+                    移入冷藏庫低溫解凍
+                  </div>
+                </div>
+
+                <!-- 2. 可開始使用 (#FFDCB4 暖杏粉桃色調) -->
+                <div class="bg-[#fff9f2] border border-[#FFDCB4] rounded-xl p-4">
+                  <div class="text-[#9c5016] font-semibold text-xs flex items-center gap-1.5 mb-1">
+                    <i class="fa-solid fa-utensils"></i> 2. 可使用日
+                  </div>
+                  <div class="text-xl font-black text-[#7a3e14] font-mono">
+                    {{ calcDisplayDates.readyMD || '--' }}
+                  </div>
+                  <div class="text-[11px] text-[#9c5016] font-medium mt-1">
+                    解凍 {{ selectedIngredient ? selectedIngredient.thawDays : 1 }} 天後達到可烹狀態
+                  </div>
+                </div>
+
+                <!-- 3. 到期過期日 (警示紅色調) -->
+                <div class="bg-rose-50 border border-rose-200 rounded-xl p-4">
+                  <div class="text-rose-600 font-semibold text-xs flex items-center gap-1.5 mb-1">
+                    <i class="fa-solid fa-triangle-exclamation"></i> 3. 過期日
+                  </div>
+                  <div class="text-xl font-black text-rose-800 font-mono">
+                    {{ calcDisplayDates.expireMD || '--' }}
+                  </div>
+                  <div class="text-[11px] text-rose-600 font-medium mt-1">
+                    可使用 {{ selectedIngredient ? selectedIngredient.useDays : 3 }} 天，此日過期
+                  </div>
+                </div>
+              </div>
+
+              <!-- 簡單明瞭的時間線 -->
+              <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs">
+                <div class="flex items-center justify-between text-slate-600 font-mono">
+                  <div class="flex items-center gap-1.5 text-[#4a57d6] font-bold">
+                    <span>🧊 {{ calcDisplayDates.thawMD }} 解凍</span>
+                  </div>
+                  <i class="fa-solid fa-arrow-right text-slate-300"></i>
+                  <div class="flex items-center gap-1.5 text-[#9c5016] font-bold">
+                    <span>🍳 {{ calcDisplayDates.readyMD }} 開始使用</span>
+                  </div>
+                  <i class="fa-solid fa-arrow-right text-slate-300"></i>
+                  <div class="flex items-center gap-1.5 text-rose-700 font-bold">
+                    <span>⚠️ {{ calcDisplayDates.expireMD }} 過期</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 當前選擇食材的快速摘要 -->
+              <div v-if="selectedIngredient" class="text-xs text-slate-500 bg-white p-3 rounded-xl border border-slate-100 flex items-center justify-between">
+                <span>食材名稱：<strong class="text-slate-800">{{ selectedIngredient.name }}</strong></span>
+                <span>標籤：<span :class="getTagBadgeClass(selectedIngredient.category)" class="px-2 py-0.5 rounded-full font-medium">{{ selectedIngredient.category }}</span></span>
+                <span>解凍天數：<strong class="text-slate-800">{{ selectedIngredient.thawDays }} 天</strong></span>
+                <span>使用天數：<strong class="text-slate-800">{{ selectedIngredient.useDays }} 天</strong></span>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 2: 每日解凍記錄 (純粹食材名稱 + 解凍日期 + 備註解幾用幾) -->
+      <!-- ========================================== -->
+      <section v-if="activeTab === 'daily'" class="space-y-6">
+        
+        <!-- 頂部資訊與快速記錄工具列 -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div>
+              <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-calendar-check text-[#8894FF]"></i> 每日解凍記錄
+              </h2>
+              <p class="text-xs text-slate-500 mt-0.5">以「解凍日期」歸納每日食材，純粹顯示食材品名與解凍時間</p>
+            </div>
+
+            <!-- 清除過期按鈕 -->
+            <button 
+              v-if="dailyRecords.length > 0"
+              @click="clearExpiredDailyRecords" 
+              class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+              <i class="fa-solid fa-broom"></i> 清除已過期項目
+            </button>
+          </div>
+
+          <!-- 快速為特定日期新增解凍項目列 -->
+          <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold text-slate-600 whitespace-nowrap">解凍日期：</span>
+              <input 
+                type="date" 
+                v-model="quickAddDate" 
+                class="px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 font-mono bg-white focus:outline-none focus:ring-2 focus:ring-[#8894FF]">
+            </div>
+
+            <div class="flex-1 min-w-[200px]">
+              <select 
+                v-model="quickAddIngredientId" 
+                class="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#8894FF]">
+                <option value="" disabled>請選擇要解凍的食材...</option>
+                <option v-for="item in ingredients" :key="item.id" :value="item.id">
+                  [{{ item.category }}] {{ item.name }}（備註：解{{ item.thawDays }}用{{ item.useDays }}）
+                </option>
+              </select>
+            </div>
+
+            <!-- 新增按鈕 (#8894FF) -->
+            <button 
+              @click="quickAddRecord" 
+              :disabled="!quickAddIngredientId"
+              class="px-4 py-1.5 bg-[#8894FF] hover:bg-[#7582f8] disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shadow-sm shadow-[#8894FF]/25">
+              <i class="fa-solid fa-plus"></i> 新增至此日
+            </button>
+          </div>
+        </div>
+
+        <!-- 每日分組列表 -->
+        <div v-if="groupedDailyRecords.length > 0" class="space-y-4">
+          <div 
+            v-for="group in groupedDailyRecords" 
+            :key="group.date"
+            class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            
+            <!-- 分組日期標題 -->
+            <div class="bg-slate-100/80 px-5 py-3 border-b border-slate-200 flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-[#8894FF] to-[#a3aeff] text-white flex items-center justify-center text-xs shadow-sm">
+                  <i class="fa-solid fa-calendar-day"></i>
+                </div>
+                <h3 class="font-bold text-slate-800 text-sm">
+                  {{ group.dateFormatted }} 解凍項目
+                </h3>
+                <span v-if="group.isToday" class="bg-[#FFDCB4] text-[#7a3e14] border border-[#fcc78e] text-[10px] px-2 py-0.5 rounded-full font-bold">
+                  今天新增
+                </span>
+                <!-- 刪除整天所有解凍項目 -->
+                <button 
+                  @click="deleteWholeDayRecords(group.date, group.dateFormatted)"
+                  class="ml-1 px-2 py-0.5 text-xs text-rose-600 hover:text-white hover:bg-rose-600 border border-rose-300 bg-rose-50 rounded-md font-bold transition-all flex items-center gap-1 shadow-2xs"
+                  title="刪除此日所有解凍項目">
+                  <i class="fa-solid fa-trash-can text-[10px]"></i>
+                  <span>刪除</span>
+                </button>
+              </div>
+              <span class="text-xs text-slate-500 font-mono">共 {{ group.items.length }} 項食材</span>
+            </div>
+
+            <!-- 食材列表 (純粹 食材名稱 + 解凍日期 + 備註解幾用幾 + 效期) -->
+            <div class="divide-y divide-slate-100">
+              <div 
+                v-for="record in group.items" 
+                :key="record.id"
+                class="px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                
+                <!-- 左側：標籤、純粹食材名稱、備註解幾用幾 (#FFDCB4 柔和蜜桃色徽章) -->
+                <div class="flex items-center space-x-2.5 flex-wrap gap-y-1">
+                  <span :class="getTagBadgeClass(record.category)" class="text-xs px-2.5 py-0.5 rounded-full font-medium">
+                    {{ record.category }}
+                  </span>
+                  <span class="font-bold text-slate-900 text-sm">
+                    {{ record.name }}
+                  </span>
+                  <!-- 備註：解幾用幾 -->
+                  <span class="text-xs font-mono font-bold text-[#7a3e14] bg-[#FFDCB4]/60 border border-[#FFDCB4] px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                    <i class="fa-solid fa-clock-rotate-left text-[10px] text-[#9c5016]"></i>
+                    備註：解{{ record.thawDays || 1 }}用{{ record.useDays || 3 }}
+                  </span>
+                </div>
+
+                <!-- 右側：解凍日期 ➔ 可使用 ➔ 過期 狀態 -->
+                <div class="flex items-center space-x-4">
+                  <!-- 解凍與過期區間 -->
+                  <div class="text-xs font-mono text-slate-600 flex items-center gap-2">
+                    <span class="text-slate-500">
+                      {{ record.thawDateMD }} 解凍
+                    </span>
+                    <i class="fa-solid fa-arrow-right text-[10px] text-slate-300"></i>
+                    <span class="text-[#9c5016] font-semibold">
+                      {{ record.readyDateMD }} 使用
+                    </span>
+                    <i class="fa-solid fa-arrow-right text-[10px] text-slate-300"></i>
+                    <span class="text-rose-600 font-semibold">
+                      {{ record.expireDateMD }} 過期
+                    </span>
+                  </div>
+
+                  <!-- 狀態標籤 -->
+                  <span :class="getRecordStatus(record).badgeClass" class="text-[11px] px-2 py-0.5 rounded-full font-bold">
+                    {{ getRecordStatus(record).text }}
+                  </span>
+
+                  <!-- 刪除此條記錄 -->
+                  <button 
+                    @click="deleteDailyRecord(record.id)" 
+                    class="text-slate-400 hover:text-rose-600 p-1 transition-colors"
+                    title="移除此項記錄">
+                    <i class="fa-solid fa-trash-can text-xs"></i>
+                  </button>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div v-else class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-slate-400">
+          <i class="fa-solid fa-calendar-xmark text-4xl mb-3 text-slate-300"></i>
+          <p class="text-sm font-medium text-slate-700">目前尚無解凍記錄</p>
+          <p class="text-xs text-slate-400 mt-1">可在上方快速選擇食材新增，或至「效期推算查詢」挑選後一鍵加入！</p>
+        </div>
+
+      </section>
+
+      <!-- ========================================== -->
+      <!-- TAB 3: 食材資料庫管理 (純粹品名與天數，無備註) -->
+      <!-- ========================================== -->
+      <section v-if="activeTab === 'manage'" class="space-y-6">
+        
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-database text-[#8894FF]"></i> 食材規則庫
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">管理肉品標籤（豬肉、雞肉、牛肉）與解凍/可用天數，可隨時新增或移除</p>
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <!-- 新增食材按鈕 (#8894FF) -->
+            <button 
+              @click="openAddModal" 
+              class="w-full sm:w-auto px-4 py-2 bg-[#8894FF] hover:bg-[#7582f8] text-white rounded-xl text-xs font-bold shadow-sm shadow-[#8894FF]/25 transition-all flex items-center justify-center gap-2">
+              <i class="fa-solid fa-plus"></i> 新增食材規則
+            </button>
+          </div>
+        </div>
+
+        <!-- 標籤篩選與搜尋 -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between gap-3 items-center">
+          <div class="flex flex-wrap gap-2 w-full md:w-auto">
+            <button 
+              v-for="cat in ['全部', '豬肉', '雞肉', '牛肉', '其他']" 
+              :key="cat"
+              @click="manageFilterCat = cat"
+              :class="manageFilterCat === cat ? 'bg-[#8894FF] text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
+              class="px-3 py-1.5 text-xs rounded-lg font-medium transition-colors flex items-center gap-1.5">
+              <span v-if="cat === '豬肉'">🐷 豬肉</span>
+              <span v-else-if="cat === '雞肉'">🐔 雞肉</span>
+              <span v-else-if="cat === '牛肉'">🥩 牛肉</span>
+              <span v-else>{{ cat }}</span>
+              <span class="text-[10px] opacity-80 px-1.5 py-0.2 rounded-full bg-black/10">
+                {{ getCountByCategory(cat) }}
+              </span>
+            </button>
+          </div>
+
+          <div class="w-full md:w-64 relative">
+            <i class="fa-solid fa-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input 
+              type="text" 
+              v-model="manageSearchKeyword" 
+              placeholder="搜尋食材名稱..." 
+              class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#8894FF]">
+          </div>
+        </div>
+
+        <!-- 食材列表 (純粹食材名稱、天數與操作，無備註) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div 
+            v-for="item in filteredManageIngredients" 
+            :key="item.id"
+            class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
+            
+            <div>
+              <div class="flex items-start justify-between gap-2 mb-3">
+                <div class="flex items-center gap-2">
+                  <span :class="getTagBadgeClass(item.category)" class="text-xs px-2.5 py-0.5 rounded-full font-medium">
+                    {{ item.category }}
+                  </span>
+                  <h4 class="font-bold text-slate-900 text-sm group-hover:text-[#4a57d6] transition-colors">
+                    {{ item.name }}
+                  </h4>
+                </div>
+                
+                <div class="flex items-center space-x-1 opacity-70 group-hover:opacity-100">
+                  <button @click="openEditModal(item)" class="p-1 text-slate-400 hover:text-[#4a57d6] rounded">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                  </button>
+                  <button @click="deleteIngredient(item.id)" class="p-1 text-slate-400 hover:text-rose-600 rounded">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 核心參數：解凍天數與可使用天數 -->
+              <div class="grid grid-cols-2 gap-2 text-center">
+                <div class="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <span class="text-[10px] text-slate-400 block">解凍天數</span>
+                  <span class="text-xs font-bold text-slate-800 font-mono">{{ item.thawDays }} 天</span>
+                </div>
+                <div class="bg-[#fff9f2] p-2 rounded-lg border border-[#FFDCB4]">
+                  <span class="text-[10px] text-[#9c5016] block">可使用天數</span>
+                  <span class="text-xs font-bold text-[#7a3e14] font-mono">{{ item.useDays }} 天</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 帶入推算按鈕 -->
+            <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+              <span class="text-[11px] text-slate-400 font-mono">
+                週期：{{ item.thawDays + item.useDays }} 天
+              </span>
+              <button 
+                @click="applyToCalcAndSwitch(item)" 
+                class="text-xs text-[#4a57d6] hover:text-[#323a8e] font-semibold flex items-center gap-1">
+                帶入推算 <i class="fa-solid fa-arrow-right text-[10px]"></i>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <div v-if="filteredManageIngredients.length === 0" class="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400">
+          <i class="fa-solid fa-box-open text-4xl mb-3 text-slate-300"></i>
+          <p class="text-sm">查無符合條件的食材，點擊右上角即可新增！</p>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODAL: 新增 / 編輯食材規則 (純粹品名與天數，無備註) -->
+    <!-- ========================================== -->
+    <div v-if="showEditModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-sm w-full p-5 space-y-4">
+        
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+            <i class="fa-solid fa-pen-nib text-[#8894FF]"></i>
+            {{ isEditing ? '編輯食材規則' : '新增食材規則' }}
+          </h3>
+          <button @click="showEditModal = false" class="text-slate-400 hover:text-slate-600">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <form @submit.prevent="saveIngredient" class="space-y-3.5 text-xs">
+          <!-- 食材名稱 -->
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">食材品名 <span class="text-rose-500">*</span></label>
+            <input 
+              type="text" 
+              v-model="modalForm.name" 
+              required 
+              placeholder="例如：冷藏豬五花肉片、去骨雞腿排..." 
+              class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#8894FF] text-xs">
+          </div>
+
+          <!-- 分類標籤 -->
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">肉類標籤 <span class="text-rose-500">*</span></label>
+            <div class="grid grid-cols-4 gap-1.5">
+              <label 
+                v-for="cat in ['豬肉', '雞肉', '牛肉', '其他']" 
+                :key="cat"
+                :class="modalForm.category === cat ? 'border-[#8894FF] bg-[#8894FF]/10 text-[#4a57d6] font-bold' : 'border-slate-200 text-slate-600 hover:bg-slate-50'"
+                class="border rounded-lg p-2 text-center cursor-pointer transition-colors text-xs">
+                <input type="radio" v-model="modalForm.category" :value="cat" class="hidden">
+                <span v-if="cat === '豬肉'">🐷 豬肉</span>
+                <span v-else-if="cat === '雞肉'">🐔 雞肉</span>
+                <span v-else-if="cat === '牛肉'">🥩 牛肉</span>
+                <span v-else>🍖 其他</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 解凍天數與可使用天數 -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">
+                解凍所需天數 (天)
+              </label>
+              <input 
+                type="number" 
+                v-model.number="modalForm.thawDays" 
+                min="0.5" 
+                step="0.5" 
+                required 
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#8894FF] font-mono text-xs">
+              <span class="text-[10px] text-slate-400 mt-0.5 block">常規建議 1 天</span>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">
+                解凍後可用天數 (天)
+              </label>
+              <input 
+                type="number" 
+                v-model.number="modalForm.useDays" 
+                min="1" 
+                step="1" 
+                required 
+                class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#8894FF] font-mono text-xs">
+              <span class="text-[10px] text-slate-400 mt-0.5 block">常規建議 3 天</span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
+            <button 
+              type="button" 
+              @click="showEditModal = false" 
+              class="px-3.5 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-medium">
+              取消
+            </button>
+            <button 
+              type="submit" 
+              class="px-4 py-1.5 bg-[#8894FF] hover:bg-[#7582f8] text-white rounded-lg text-xs font-bold shadow-sm shadow-[#8894FF]/25">
+              儲存食材
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </div>
+
+    <!-- 頁尾 -->
+    <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400">
+      <div class="max-w-6xl mx-auto px-4 flex items-center justify-center gap-2">
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-[#8894FF]"></span>
+        <span>食材解凍效期管理與每日記錄 • Code by RainWolf</span>
+        <span class="inline-block w-2.5 h-2.5 rounded-full bg-[#FFDCB4]"></span>
+      </div>
+    </footer>
+
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    // 預設純粹食材清單 (已完全去除備註)
+    const DEFAULT_INGREDIENTS = [
+      { id: 'p1', name: '五花肉片 / 梅花肉片', category: '豬肉', thawDays: 1, useDays: 3 },
+      { id: 'p2', name: '厚切豬里肌排 / 戰斧豬排', category: '豬肉', thawDays: 1, useDays: 3 },
+      { id: 'p3', name: '優質生鮮豬絞肉', category: '豬肉', thawDays: 1, useDays: 2 },
+      { id: 'p4', name: '燉湯排骨 / 軟骨肉', category: '豬肉', thawDays: 1, useDays: 3 },
+
+      { id: 'c1', name: '去骨生鮮雞腿排', category: '雞肉', thawDays: 1, useDays: 3 },
+      { id: 'c2', name: '低脂冷藏雞胸肉', category: '雞肉', thawDays: 1, useDays: 3 },
+      { id: 'c3', name: '鮮嫩二節翅 / 棒棒腿', category: '雞肉', thawDays: 1, useDays: 3 },
+      { id: 'c4', name: '雞里肌肉條', category: '雞肉', thawDays: 1, useDays: 2 },
+
+      { id: 'b1', name: '頂級牛排 (肋眼/沙朗/菲力)', category: '牛肉', thawDays: 1, useDays: 3 },
+      { id: 'b2', name: '清燉/紅燒牛腩塊', category: '牛肉', thawDays: 1, useDays: 3 },
+      { id: 'b3', name: '特選牛絞肉', category: '牛肉', thawDays: 1, useDays: 2 },
+      { id: 'b4', name: '火鍋雪花牛肉片', category: '牛肉', thawDays: 1, useDays: 2 },
+
+      { id: 'o1', name: '特級大草蝦 / 白蝦', category: '其他', thawDays: 0.5, useDays: 1 },
+      { id: 'o2', name: '鮭魚切片 / 菲力', category: '其他', thawDays: 1, useDays: 2 }
+    ];
+
+    createApp({
+      setup() {
+        // 當前頁籤
+        const activeTab = ref('calculator'); // 'calculator' | 'daily' | 'manage'
+
+        // 食材規則清單
+        const ingredients = ref([]);
+        // 每日解凍記錄清單 (純粹 食材名稱 + 解凍日期)
+        const dailyRecords = ref([]);
+
+        // TAB 1: 推算器狀態
+        const calcFilterCat = ref('全部');
+        const calcSearchKeyword = ref('');
+        const selectedIngredient = ref(null);
+        const inputDate = ref(''); // YYYY-MM-DD
+
+        // TAB 2: 每日記錄快速新增
+        const quickAddDate = ref('');
+        const quickAddIngredientId = ref('');
+
+        // TAB 3: 食材規則管理狀態
+        const manageFilterCat = ref('全部');
+        const manageSearchKeyword = ref('');
+        const showEditModal = ref(false);
+        const isEditing = ref(false);
+        const modalForm = ref({
+          id: '',
+          name: '',
+          category: '豬肉',
+          thawDays: 1,
+          useDays: 3
+        });
+
+        // 格式化今天的 YYYY-MM-DD
+        const getTodayString = () => {
+          const d = new Date();
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        };
+
+        const todayFormatted = computed(() => {
+          const d = new Date();
+          return `${d.getMonth() + 1}月${d.getDate()}日`;
+        });
+
+        const resetToToday = () => {
+          inputDate.value = getTodayString();
+          quickAddDate.value = getTodayString();
+        };
+
+        // 標籤樣式輔助 (融入 #8894FF 與 #FFDCB4)
+        const getTagBadgeClass = (category) => {
+          switch(category) {
+            case '豬肉':
+              return 'bg-pink-100 text-pink-700 border border-pink-200';
+            case '雞肉':
+              return 'bg-[#FFDCB4]/70 text-[#7a3e14] border border-[#fcc78e]';
+            case '牛肉':
+              return 'bg-red-100 text-red-700 border border-red-200';
+            default:
+              return 'bg-[#8894FF]/15 text-[#4a57d6] border border-[#8894FF]/30';
+          }
+        };
+
+        // 載入資料
+        const loadData = () => {
+          const savedIng = localStorage.getItem('thaw_pure_ingredients_v2');
+          if (savedIng) {
+            try {
+              ingredients.value = JSON.parse(savedIng);
+            } catch (e) {
+              ingredients.value = [...DEFAULT_INGREDIENTS];
+            }
+          } else {
+            ingredients.value = [...DEFAULT_INGREDIENTS];
+          }
+
+          const savedRecords = localStorage.getItem('thaw_daily_records_v2');
+          if (savedRecords) {
+            try {
+              dailyRecords.value = JSON.parse(savedRecords);
+            } catch(e) {
+              dailyRecords.value = [];
+            }
+          }
+
+          if (ingredients.value.length > 0) {
+            selectedIngredient.value = ingredients.value[0];
+          }
+        };
+
+        const saveIngredientsToStorage = () => {
+          localStorage.setItem('thaw_pure_ingredients_v2', JSON.stringify(ingredients.value));
+        };
+
+        const saveDailyRecordsToStorage = () => {
+          localStorage.setItem('thaw_daily_records_v2', JSON.stringify(dailyRecords.value));
+        };
+
+        const resetToDefaultData = () => {
+          if (confirm('確定要還原為系統預設食材嗎？')) {
+            ingredients.value = [...DEFAULT_INGREDIENTS];
+            saveIngredientsToStorage();
+            selectedIngredient.value = ingredients.value[0];
+          }
+        };
+
+        // 日期計算輔助函式：給定 YYYY-MM-DD 與天數，回傳計算後的 Date 與格式化
+        const addDaysToDate = (dateStr, days) => {
+          const [y, m, d] = dateStr.split('-').map(Number);
+          const dt = new Date(y, m - 1, d);
+          dt.setDate(dt.getDate() + days);
+          const ry = dt.getFullYear();
+          const rm = String(dt.getMonth() + 1).padStart(2, '0');
+          const rd = String(dt.getDate()).padStart(2, '0');
+          return {
+            full: `${ry}-${rm}-${rd}`,
+            md: `${dt.getMonth() + 1}/${dt.getDate()}`,
+            dateObj: dt
+          };
+        };
+
+        // 格式化 YYYY-MM-DD 成 M/D
+        const formatMD = (dateStr) => {
+          if (!dateStr) return '';
+          const parts = dateStr.split('-');
+          if (parts.length < 3) return dateStr;
+          return `${Number(parts[1])}/${Number(parts[2])}`;
+        };
+
+        // TAB 1 篩選食材
+        const filteredCalcIngredients = computed(() => {
+          return ingredients.value.filter(item => {
+            const matchCat = calcFilterCat.value === '全部' || item.category === calcFilterCat.value;
+            const matchKw = !calcSearchKeyword.value || item.name.toLowerCase().includes(calcSearchKeyword.value.toLowerCase().trim());
+            return matchCat && matchKw;
+          });
+        });
+
+        // TAB 3 篩選食材
+        const filteredManageIngredients = computed(() => {
+          return ingredients.value.filter(item => {
+            const matchCat = manageFilterCat.value === '全部' || item.category === manageFilterCat.value;
+            const matchKw = !manageSearchKeyword.value || item.name.toLowerCase().includes(manageSearchKeyword.value.toLowerCase().trim());
+            return matchCat && matchKw;
+          });
+        });
+
+        const getCountByCategory = (category) => {
+          if (category === '全部') return ingredients.value.length;
+          return ingredients.value.filter(i => i.category === category).length;
+        };
+
+        const selectIngredient = (item) => {
+          selectedIngredient.value = item;
+        };
+
+        // 推算器時間輸出
+        const calcDisplayDates = computed(() => {
+          const dateStr = inputDate.value || getTodayString();
+          const thawDays = selectedIngredient.value ? selectedIngredient.value.thawDays : 1;
+          const useDays = selectedIngredient.value ? selectedIngredient.value.useDays : 3;
+
+          const thawMD = formatMD(dateStr);
+          const readyCalc = addDaysToDate(dateStr, thawDays);
+          const expireCalc = addDaysToDate(readyCalc.full, useDays);
+
+          return {
+            thawMD,
+            readyMD: readyCalc.md,
+            expireMD: expireCalc.md,
+            readyFull: readyCalc.full,
+            expireFull: expireCalc.full,
+            exampleText: `${thawMD} 解凍 ➔ ${readyCalc.md} 使用 ➔ ${expireCalc.md} 過期`
+          };
+        });
+
+        // 帶入推算並切換到推算頁
+        const applyToCalcAndSwitch = (item) => {
+          selectedIngredient.value = item;
+          activeTab.value = 'calculator';
+        };
+
+        // TAB 1 按鈕：一鍵加入每日解凍記錄
+        const addCurrentToDailyRecord = () => {
+          if (!selectedIngredient.value) return;
+          const dateStr = inputDate.value || getTodayString();
+          const thawDays = selectedIngredient.value.thawDays;
+          const useDays = selectedIngredient.value.useDays;
+
+          const readyCalc = addDaysToDate(dateStr, thawDays);
+          const expireCalc = addDaysToDate(readyCalc.full, useDays);
+
+          const newRecord = {
+            id: 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            name: selectedIngredient.value.name,
+            category: selectedIngredient.value.category,
+            thawDate: dateStr, // YYYY-MM-DD
+            thawDateMD: formatMD(dateStr),
+            readyDate: readyCalc.full,
+            readyDateMD: readyCalc.md,
+            expireDate: expireCalc.full,
+            expireDateMD: expireCalc.md,
+            thawDays,
+            useDays,
+            createdAt: Date.now()
+          };
+
+          dailyRecords.value.unshift(newRecord);
+          saveDailyRecordsToStorage();
+          alert(`已成功將「${selectedIngredient.value.name}」記入 ${formatMD(dateStr)} 解凍項目！`);
+        };
+
+        // TAB 2: 在每日記錄中快速新增
+        const quickAddRecord = () => {
+          if (!quickAddIngredientId.value) return;
+          const item = ingredients.value.find(i => i.id === quickAddIngredientId.value);
+          if (!item) return;
+
+          const dateStr = quickAddDate.value || getTodayString();
+          const readyCalc = addDaysToDate(dateStr, item.thawDays);
+          const expireCalc = addDaysToDate(readyCalc.full, item.useDays);
+
+          const newRecord = {
+            id: 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+            name: item.name,
+            category: item.category,
+            thawDate: dateStr,
+            thawDateMD: formatMD(dateStr),
+            readyDate: readyCalc.full,
+            readyDateMD: readyCalc.md,
+            expireDate: expireCalc.full,
+            expireDateMD: expireCalc.md,
+            thawDays: item.thawDays,
+            useDays: item.useDays,
+            createdAt: Date.now()
+          };
+
+          dailyRecords.value.unshift(newRecord);
+          saveDailyRecordsToStorage();
+          quickAddIngredientId.value = '';
+        };
+
+        // 每日記錄依日期分組
+        const groupedDailyRecords = computed(() => {
+          const today = getTodayString();
+          const groups = {};
+
+          dailyRecords.value.forEach(record => {
+            const date = record.thawDate;
+            if (!groups[date]) {
+              groups[date] = [];
+            }
+            groups[date].push(record);
+          });
+
+          // 按解凍日期由新到舊排序
+          return Object.keys(groups)
+            .sort((a, b) => b.localeCompare(a))
+            .map(date => {
+              const parts = date.split('-');
+              const dateFormatted = `${Number(parts[1])}月${Number(parts[2])}日`;
+              return {
+                date,
+                dateFormatted,
+                isToday: date === today,
+                items: groups[date]
+              };
+            });
+        });
+
+        const totalDailyRecordCount = computed(() => dailyRecords.value.length);
+
+        // 依據今天日期判斷解凍狀態
+        const getRecordStatus = (record) => {
+          const today = getTodayString();
+          if (today < record.readyDate) {
+            return {
+              text: '解凍中',
+              badgeClass: 'bg-[#f0f2ff] text-[#4a57d6] border border-[#c5cbff]'
+            };
+          } else if (today >= record.readyDate && today < record.expireDate) {
+            return {
+              text: '可使用',
+              badgeClass: 'bg-[#FFDCB4]/70 text-[#7a3e14] border border-[#FFDCB4]'
+            };
+          } else {
+            return {
+              text: '已過期',
+              badgeClass: 'bg-rose-100 text-rose-800 border border-rose-200'
+            };
+          }
+        };
+
+        // 刪除單條記錄
+        const deleteDailyRecord = (id) => {
+          dailyRecords.value = dailyRecords.value.filter(r => r.id !== id);
+          saveDailyRecordsToStorage();
+        };
+
+        // 刪除整天的所有解凍記錄
+        const deleteWholeDayRecords = (date, dateFormatted) => {
+          if (confirm(`確定要刪除「${dateFormatted}」的所有解凍項目嗎？`)) {
+            dailyRecords.value = dailyRecords.value.filter(r => r.thawDate !== date);
+            saveDailyRecordsToStorage();
+          }
+        };
+
+        // 清理已過期項目
+        const clearExpiredDailyRecords = () => {
+          const today = getTodayString();
+          dailyRecords.value = dailyRecords.value.filter(r => today < r.expireDate);
+          saveDailyRecordsToStorage();
+        };
+
+        // TAB 3: 食材新增/編輯
+        const openAddModal = () => {
+          isEditing.value = false;
+          modalForm.value = {
+            id: 'ing_' + Date.now(),
+            name: '',
+            category: '豬肉',
+            thawDays: 1,
+            useDays: 3
+          };
+          showEditModal.value = true;
+        };
+
+        const openEditModal = (item) => {
+          isEditing.value = true;
+          modalForm.value = {
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            thawDays: item.thawDays,
+            useDays: item.useDays
+          };
+          showEditModal.value = true;
+        };
+
+        const saveIngredient = () => {
+          if (!modalForm.value.name.trim()) return;
+
+          if (isEditing.value) {
+            const index = ingredients.value.findIndex(i => i.id === modalForm.value.id);
+            if (index !== -1) {
+              ingredients.value[index] = { ...modalForm.value };
+            }
+          } else {
+            ingredients.value.unshift({ ...modalForm.value });
+          }
+
+          saveIngredientsToStorage();
+          showEditModal.value = false;
+
+          if (selectedIngredient.value && selectedIngredient.value.id === modalForm.value.id) {
+            selectedIngredient.value = { ...modalForm.value };
+          }
+        };
+
+        const deleteIngredient = (id) => {
+          if (confirm('確定要移除此食材規則嗎？')) {
+            ingredients.value = ingredients.value.filter(i => i.id !== id);
+            saveIngredientsToStorage();
+            if (selectedIngredient.value && selectedIngredient.value.id === id) {
+              selectedIngredient.value = ingredients.value[0] || null;
+            }
+          }
+        };
+
+        onMounted(() => {
+          resetToToday();
+          loadData();
+        });
+
+        return {
+          activeTab,
+          todayFormatted,
+          ingredients,
+          dailyRecords,
+          totalDailyRecordCount,
+          calcFilterCat,
+          calcSearchKeyword,
+          filteredCalcIngredients,
+          selectedIngredient,
+          inputDate,
+          resetToToday,
+          selectIngredient,
+          calcDisplayDates,
+          getTagBadgeClass,
+          addCurrentToDailyRecord,
+          quickAddDate,
+          quickAddIngredientId,
+          quickAddRecord,
+          groupedDailyRecords,
+          getRecordStatus,
+          deleteDailyRecord,
+          deleteWholeDayRecords,
+          clearExpiredDailyRecords,
+          manageFilterCat,
+          manageSearchKeyword,
+          filteredManageIngredients,
+          getCountByCategory,
+          openAddModal,
+          openEditModal,
+          deleteIngredient,
+          applyToCalcAndSwitch,
+          showEditModal,
+          isEditing,
+          modalForm,
+          saveIngredient
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
