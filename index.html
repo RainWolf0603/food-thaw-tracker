@@ -467,6 +467,14 @@
           </div>
 
           <div class="flex items-center gap-2 w-full sm:w-auto">
+            <!-- 導出食材 Code 按鈕 -->
+            <button 
+              @click="openExportModal" 
+              class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-200 shadow-2xs"
+              title="導出目前食材的 JavaScript 代碼以更新 index.html">
+              <i class="fa-solid fa-code text-[#8894FF]"></i>
+              <span>導出食材 Code</span>
+            </button>
             <!-- 新增食材按鈕 (#8894FF) -->
             <button 
               @click="openAddModal" 
@@ -665,6 +673,94 @@
       </div>
     </div>
 
+    <!-- ========================================== -->
+    <!-- MODAL: 導出食材代碼 (更新 Code) Modal -->
+    <!-- ========================================== -->
+    <div v-if="showExportModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
+        
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-[#8894FF]/10 text-[#4a57d6] flex items-center justify-center text-sm font-bold">
+              <i class="fa-solid fa-code"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm">
+                導出食材規則代碼（更新 index.html）
+              </h3>
+              <p class="text-[11px] text-slate-400">目前庫存共 {{ ingredients.length }} 項食材規則</p>
+            </div>
+          </div>
+          <button @click="showExportModal = false" class="text-slate-400 hover:text-slate-600">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">
+          瀏覽器基於安全性限制無法直接靜默寫入電腦硬碟檔案。您可以透過以下方式將網頁新增的食材直接更新至程式碼：
+        </p>
+
+        <!-- 方式 1: 複製 JavaScript 代碼直接貼上 -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span class="w-4 h-4 rounded-full bg-[#FFDCB4] text-[#7a3e14] text-[10px] flex items-center justify-center font-bold">1</span>
+              複製 JS 代碼貼回第 683 行（推薦）
+            </span>
+            <button 
+              @click="copyExportCode" 
+              class="px-3 py-1 bg-[#FFDCB4] hover:bg-[#fed19b] text-[#5c2d03] text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-all border border-[#fcc78e]">
+              <i class="fa-regular fa-copy"></i>
+              <span>{{ copyStatusText }}</span>
+            </button>
+          </div>
+          <textarea 
+            readonly 
+            :value="generatedJsCode" 
+            rows="6" 
+            class="w-full text-[11px] font-mono bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 focus:outline-none select-all"></textarea>
+          <p class="text-[11px] text-slate-400">
+            💡 點選上方按鈕複製後，直接回到編輯器將 <code>index.html</code> 第 683 行的 <code>const DEFAULT_INGREDIENTS = [...]</code> 覆蓋貼上即可！亦可貼在對話框由 AI 幫您寫入。
+          </p>
+        </div>
+
+        <!-- 方式 2: 一鍵下載已注入更新的 index.html -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <span class="w-4 h-4 rounded-full bg-[#8894FF] text-white text-[10px] flex items-center justify-center font-bold">2</span>
+              直接下載最新 index.html
+            </span>
+            <button 
+              @click="downloadUpdatedHtml" 
+              class="px-3 py-1 bg-[#8894FF] hover:bg-[#7280ff] text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-all">
+              <i class="fa-solid fa-download"></i> 下載最新檔案
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500">
+            系統會自動把當前所有最新食材注入整份 HTML 原始碼，下載後直接覆蓋本機檔案即可完成更新。
+          </p>
+        </div>
+
+        <!-- 重新從 Code 載入選項 -->
+        <div class="flex items-center justify-between pt-1 border-t border-slate-100">
+          <button 
+            type="button" 
+            @click="reloadFromCode" 
+            class="text-[11px] text-slate-500 hover:text-[#4a57d6] flex items-center gap-1">
+            <i class="fa-solid fa-rotate-left"></i> 以目前 Code 中的預設值重新載入
+          </button>
+          <button 
+            type="button" 
+            @click="showExportModal = false" 
+            class="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
+            關閉
+          </button>
+        </div>
+
+      </div>
+    </div>
+
     <!-- 頁尾 -->
     <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400">
       <div class="max-w-6xl mx-auto px-4 flex items-center justify-center gap-2">
@@ -681,24 +777,23 @@
 
     // 預設純粹食材清單 (已完全去除備註)
     const DEFAULT_INGREDIENTS = [
-      { id: 'p1', name: '五花肉片 / 梅花肉片', category: '豬肉', thawDays: 1, useDays: 3 },
-      { id: 'p2', name: '厚切豬里肌排 / 戰斧豬排', category: '豬肉', thawDays: 1, useDays: 3 },
-      { id: 'p3', name: '優質生鮮豬絞肉', category: '豬肉', thawDays: 1, useDays: 2 },
-      { id: 'p4', name: '燉湯排骨 / 軟骨肉', category: '豬肉', thawDays: 1, useDays: 3 },
-
-      { id: 'c1', name: '去骨生鮮雞腿排', category: '雞肉', thawDays: 1, useDays: 3 },
-      { id: 'c2', name: '低脂冷藏雞胸肉', category: '雞肉', thawDays: 1, useDays: 3 },
-      { id: 'c3', name: '鮮嫩二節翅 / 棒棒腿', category: '雞肉', thawDays: 1, useDays: 3 },
-      { id: 'c4', name: '雞里肌肉條', category: '雞肉', thawDays: 1, useDays: 2 },
-
-      { id: 'b1', name: '頂級牛排 (肋眼/沙朗/菲力)', category: '牛肉', thawDays: 1, useDays: 3 },
-      { id: 'b2', name: '清燉/紅燒牛腩塊', category: '牛肉', thawDays: 1, useDays: 3 },
-      { id: 'b3', name: '特選牛絞肉', category: '牛肉', thawDays: 1, useDays: 2 },
-      { id: 'b4', name: '火鍋雪花牛肉片', category: '牛肉', thawDays: 1, useDays: 2 },
-
-      { id: 'o1', name: '特級大草蝦 / 白蝦', category: '其他', thawDays: 0.5, useDays: 1 },
-      { id: 'o2', name: '鮭魚切片 / 菲力', category: '其他', thawDays: 1, useDays: 2 }
-    ];
+  { id: 'ing_1794760469298', name: '6', category: '其他', thawDays: 1, useDays: 3 },
+  { id: 'ing_1794760458573', name: '6767', category: '其他', thawDays: 1, useDays: 3 },
+  { id: 'p1', name: '五花肉片 / 梅花肉片', category: '豬肉', thawDays: 1, useDays: 3 },
+  { id: 'p2', name: '厚切豬里肌排 / 戰斧豬排', category: '豬肉', thawDays: 1, useDays: 3 },
+  { id: 'p3', name: '優質生鮮豬絞肉', category: '豬肉', thawDays: 1, useDays: 2 },
+  { id: 'p4', name: '燉湯排骨 / 軟骨肉', category: '豬肉', thawDays: 1, useDays: 3 },
+  { id: 'c1', name: '去骨生鮮雞腿排', category: '雞肉', thawDays: 1, useDays: 3 },
+  { id: 'c2', name: '低脂冷藏雞胸肉', category: '雞肉', thawDays: 1, useDays: 3 },
+  { id: 'c3', name: '鮮嫩二節翅 / 棒棒腿', category: '雞肉', thawDays: 1, useDays: 3 },
+  { id: 'c4', name: '雞里肌肉條', category: '雞肉', thawDays: 1, useDays: 2 },
+  { id: 'b1', name: '頂級牛排 (肋眼/沙朗/菲力)', category: '牛肉', thawDays: 1, useDays: 3 },
+  { id: 'b2', name: '清燉/紅燒牛腩塊', category: '牛肉', thawDays: 1, useDays: 3 },
+  { id: 'b3', name: '特選牛絞肉', category: '牛肉', thawDays: 1, useDays: 2 },
+  { id: 'b4', name: '火鍋雪花牛肉片', category: '牛肉', thawDays: 1, useDays: 2 },
+  { id: 'o1', name: '特級大草蝦 / 白蝦', category: '其他', thawDays: 0.5, useDays: 1 },
+  { id: 'o2', name: '鮭魚切片 / 菲力', category: '其他', thawDays: 1, useDays: 2 }
+];
 
     createApp({
       setup() {
@@ -1072,6 +1167,69 @@
           }
         };
 
+        // 導出食材代碼以更新 Code 相關邏輯
+        const showExportModal = ref(false);
+        const copyStatusText = ref('一鍵複製 Code');
+
+        const openExportModal = () => {
+          showExportModal.value = true;
+          copyStatusText.value = '一鍵複製 Code';
+        };
+
+        const generatedJsCode = computed(() => {
+          const lines = ingredients.value.map(item => {
+            return `  { id: '${item.id}', name: '${item.name}', category: '${item.category}', thawDays: ${item.thawDays}, useDays: ${item.useDays} }`;
+          }).join(',\n');
+          return `const DEFAULT_INGREDIENTS = [\n${lines}\n];`;
+        });
+
+        const copyExportCode = async () => {
+          try {
+            await navigator.clipboard.writeText(generatedJsCode.value);
+            copyStatusText.value = '✅ 已複製到剪貼簿！';
+            setTimeout(() => {
+              copyStatusText.value = '一鍵複製 Code';
+            }, 2500);
+          } catch (e) {
+            copyStatusText.value = '複製失敗，請手動選取';
+          }
+        };
+
+        const downloadUpdatedHtml = () => {
+          fetch(window.location.href)
+            .then(res => res.text())
+            .then(rawHtml => {
+              const regex = /const DEFAULT_INGREDIENTS = \[[\s\S]*?\];/;
+              const newHtml = rawHtml.replace(regex, generatedJsCode.value);
+              const blob = new Blob([newHtml], { type: 'text/html;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'index.html';
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            })
+            .catch(() => {
+              copyExportCode();
+              alert('已為您複製最新食材代碼！請至 index.html 第 683 行替換即可。');
+            });
+        };
+
+        const reloadFromCode = () => {
+          if (confirm('確定要捨棄瀏覽器暫存，直接以 index.html 中的 DEFAULT_INGREDIENTS 重新載入嗎？')) {
+            localStorage.removeItem('thaw_pure_ingredients_v2');
+            ingredients.value = [...DEFAULT_INGREDIENTS];
+            saveIngredientsToStorage();
+            if (ingredients.value.length > 0) {
+              selectedIngredient.value = ingredients.value[0];
+            }
+            alert('已成功依目前 Code 的 DEFAULT_INGREDIENTS 重新載入！');
+            showExportModal.value = false;
+          }
+        };
+
         onMounted(() => {
           resetToToday();
           loadData();
@@ -1112,7 +1270,14 @@
           showEditModal,
           isEditing,
           modalForm,
-          saveIngredient
+          saveIngredient,
+          showExportModal,
+          copyStatusText,
+          openExportModal,
+          generatedJsCode,
+          copyExportCode,
+          downloadUpdatedHtml,
+          reloadFromCode
         };
       }
     }).mount('#app');
